@@ -363,24 +363,20 @@ struct Atsr : Via<ATSR_OVERSAMPLE_AMOUNT, ATSR_OVERSAMPLE_QUALITY> {
         // but its woven pretty deep so is a nagging style thing to fix
 
         if (virtualModule.runtimeDisplay & !virtualModule.shOn) {
-            lights[LED1_LIGHT].setSmoothBrightness(virtualModule.blueLevelWrite/4095.0, ledDecay);
-            lights[LED3_LIGHT].setSmoothBrightness(virtualModule.redLevelWrite/4095.0, ledDecay);
+            lights[LED1_LIGHT].setSmoothBrightness(virtualModule.blueLevelOut/4095.0, ledDecay);
+            lights[LED3_LIGHT].setSmoothBrightness(virtualModule.redLevelOut/4095.0, ledDecay);
         } else {
-            ledAState = virtualLogicOut(ledAState, virtualModule.ledAOutput);
-            ledBState = virtualLogicOut(ledBState, virtualModule.ledBOutput);
             lights[LED1_LIGHT].setSmoothBrightness(ledAState, ledDecay);
             lights[LED3_LIGHT].setSmoothBrightness(ledBState, ledDecay);
         }
-        ledCState = virtualLogicOut(ledCState, virtualModule.ledCOutput);
-        ledDState = virtualLogicOut(ledDState, virtualModule.ledDOutput);
 
 
         lights[LED2_LIGHT].setSmoothBrightness(ledCState, ledDecay);
         lights[LED4_LIGHT].setSmoothBrightness(ledDState, ledDecay);
 
-        lights[RED_LIGHT].setSmoothBrightness(virtualModule.redLevelWrite/4095.0, ledDecay);
-        lights[GREEN_LIGHT].setSmoothBrightness(virtualModule.greenLevelWrite/4095.0, ledDecay);
-        lights[BLUE_LIGHT].setSmoothBrightness(virtualModule.blueLevelWrite/4095.0, ledDecay);
+        lights[RED_LIGHT].setSmoothBrightness(virtualModule.redLevelOut/4095.0, ledDecay);
+        lights[GREEN_LIGHT].setSmoothBrightness(virtualModule.greenLevelOut/4095.0, ledDecay);
+        lights[BLUE_LIGHT].setSmoothBrightness(virtualModule.blueLevelOut/4095.0, ledDecay);
 
         float output = outputs[MAIN_OUTPUT].value/8.0;
         lights[OUTPUT_RED_LIGHT].setSmoothBrightness(clamp(-output, 0.0, 1.0), ledDecay);
@@ -427,43 +423,43 @@ void Atsr::process(const ProcessArgs &args) {
         updateLEDs();
     }
 
-    acquireCVs();
+    // acquireCVs(0);
 
-    processLogicInputs();
+    // processLogicInputs(0);
 
-    virtualModule.halfTransferCallback();
-    float dac1Sample = (float) virtualModule.outputs.dac1Samples[0];
-    float dac2Sample = (float) virtualModule.outputs.dac2Samples[0];
-    float dac3Sample = (float) virtualModule.outputs.dac3Samples[0];
-    updateLogicOutputs();
+    // virtualModule.halfTransferCallback();
+    // float dac1Sample = (float) virtualModule.outputs.dac1Samples[0];
+    // float dac2Sample = (float) virtualModule.outputs.dac2Samples[0];
+    // float dac3Sample = (float) virtualModule.outputs.dac3Samples[0];
+    // updateLogicOutputs();
 
-    // "model" the circuit
-    // A and B inputs with normalled reference voltages
-    float aIn = inputs[A_INPUT].getVoltage() + (!inputs[A_INPUT].isConnected()) * params[A_PARAM].getValue();
-    float bIn = (inputs[B_INPUT].isConnected()) * ((inputs[B_INPUT].getVoltage()) * (params[B_PARAM].getValue())) + (!inputs[B_INPUT].isConnected()) * (5* (params[B_PARAM].getValue()));
+    // // "model" the circuit
+    // // A and B inputs with normalled reference voltages
+    // float aIn = inputs[A_INPUT].getVoltage() + (!inputs[A_INPUT].isConnected()) * params[A_PARAM].getValue();
+    // float bIn = (inputs[B_INPUT].isConnected()) * ((inputs[B_INPUT].getVoltage()) * (params[B_PARAM].getValue())) + (!inputs[B_INPUT].isConnected()) * (5* (params[B_PARAM].getValue()));
     
-    // sample and holds
-    // get a new sample on the rising edge at the sh control output
-    if (shAControl > shALast) {
-        aSample = aIn;
-    }
-    if (shBControl > shBLast) {
-        bSample = bIn;
-    }
+    // // sample and holds
+    // // get a new sample on the rising edge at the sh control output
+    // if (shAControl > shALast) {
+    //     aSample = aIn;
+    // }
+    // if (shBControl > shBLast) {
+    //     bSample = bIn;
+    // }
 
-    shALast = shAControl;
-    shBLast = shBControl;
+    // shALast = shAControl;
+    // shBLast = shBControl;
 
-    // either use the sample or track depending on the sh control output
-    aIn = shAControl * aSample + !shAControl * aIn;
-    bIn = shBControl * bSample + !shBControl * bIn;
+    // // either use the sample or track depending on the sh control output
+    // aIn = shAControl * aSample + !shAControl * aIn;
+    // bIn = shBControl * bSample + !shBControl * bIn;
 
-    // VCA/mixing stage
-    // normalize 15 bits to 0-1
-    outputs[MAIN_OUTPUT].setVoltage(bIn*(dac2Sample/32767.0) + aIn*(dac1Sample/32767.0)); 
-    outputs[AUX_DAC_OUTPUT].setVoltage((dac3Sample/4095.0 - .5) * -10.666666666);
-    outputs[LOGICA_OUTPUT].setVoltage(logicAState * 5.0);
-    outputs[AUX_LOGIC_OUTPUT].setVoltage(auxLogicState * 5.0);
+    // // VCA/mixing stage
+    // // normalize 15 bits to 0-1
+    // outputs[MAIN_OUTPUT].setVoltage(bIn*(dac2Sample/32767.0) + aIn*(dac1Sample/32767.0)); 
+    // outputs[AUX_DAC_OUTPUT].setVoltage((dac3Sample/4095.0 - .5) * -10.666666666);
+    // outputs[LOGICA_OUTPUT].setVoltage(logicAState * 5.0);
+    // outputs[AUX_LOGIC_OUTPUT].setVoltage(auxLogicState * 5.0);
     
 }
 

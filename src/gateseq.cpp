@@ -461,65 +461,65 @@ void Gateseq::process(const ProcessArgs &args) {
 
     }
 
-    // manage the software timers
-    virtualModule.sequencer.virtualTimer1Count += virtualModule.sequencer.virtualTimer1Enable;
-    virtualModule.sequencer.virtualTimer2Count += virtualModule.sequencer.virtualTimer2Enable;
-    virtualModule.sequencer.virtualTimer3Count += virtualModule.sequencer.virtualTimer3Enable;
-    virtualModule.sequencer.virtualTimer4Count += virtualModule.sequencer.virtualTimer4Enable;
+    // // manage the software timers
+    // virtualModule.sequencer.virtualTimer1Count += virtualModule.sequencer.virtualTimer1Enable;
+    // virtualModule.sequencer.virtualTimer2Count += virtualModule.sequencer.virtualTimer2Enable;
+    // virtualModule.sequencer.virtualTimer3Count += virtualModule.sequencer.virtualTimer3Enable;
+    // virtualModule.sequencer.virtualTimer4Count += virtualModule.sequencer.virtualTimer4Enable;
 
-    if (virtualModule.sequencer.virtualTimer2Count >= virtualModule.sequencer.virtualTimer2Overflow) {
-        virtualModule.auxTimer1InterruptCallback();
-        virtualModule.sequencer.virtualTimer2Count = 0;
-    }
-    if (virtualModule.sequencer.virtualTimer3Count >= virtualModule.sequencer.virtualTimer3Overflow) {
-        virtualModule.auxTimer2InterruptCallback();
-        virtualModule.sequencer.virtualTimer3Count = 0;
-    }
-    if (virtualModule.sequencer.virtualTimer4Count >= virtualModule.sequencer.virtualTimer4Overflow) {
-        virtualModule.auxTimer3InterruptCallback();
-        virtualModule.sequencer.virtualTimer4Count = 0;
-    }
+    // if (virtualModule.sequencer.virtualTimer2Count >= virtualModule.sequencer.virtualTimer2Overflow) {
+    //     virtualModule.auxTimer1InterruptCallback();
+    //     virtualModule.sequencer.virtualTimer2Count = 0;
+    // }
+    // if (virtualModule.sequencer.virtualTimer3Count >= virtualModule.sequencer.virtualTimer3Overflow) {
+    //     virtualModule.auxTimer2InterruptCallback();
+    //     virtualModule.sequencer.virtualTimer3Count = 0;
+    // }
+    // if (virtualModule.sequencer.virtualTimer4Count >= virtualModule.sequencer.virtualTimer4Overflow) {
+    //     virtualModule.auxTimer3InterruptCallback();
+    //     virtualModule.sequencer.virtualTimer4Count = 0;
+    // }
 
-    acquireCVs();
-    processLogicInputs();
-    updateOutputs();
+    // acquireCVs();
+    // processLogicInputs();
+    // updateOutputs();
 
-    updateLogicOutputs();
-    virtualIO->halfTransferCallback();
+    // updateLogicOutputs();
+    // virtualIO->halfTransferCallback();
 
-    float dac1Sample = (float) virtualIO->outputs.dac1Samples[0];
-    float dac2Sample = (float) virtualIO->outputs.dac2Samples[0];
-    float dac3Sample = (float) virtualIO->outputs.dac3Samples[0];
+    // float dac1Sample = (float) virtualIO->outputs.dac1Samples[0];
+    // float dac2Sample = (float) virtualIO->outputs.dac2Samples[0];
+    // float dac3Sample = (float) virtualIO->outputs.dac3Samples[0];
 
-    // "model" the circuit
-    // A and B inputs with normalled reference voltages
-    float aIn = inputs[A_INPUT].getVoltage() + (!inputs[A_INPUT].isConnected()) * params[A_PARAM].getValue();
-    float bIn = (inputs[B_INPUT].isConnected()) * ((inputs[B_INPUT].getVoltage()) * (params[B_PARAM].getValue())) + (!inputs[B_INPUT].isConnected()) * (5* (params[B_PARAM].getValue()));
+    // // "model" the circuit
+    // // A and B inputs with normalled reference voltages
+    // float aIn = inputs[A_INPUT].getVoltage() + (!inputs[A_INPUT].isConnected()) * params[A_PARAM].getValue();
+    // float bIn = (inputs[B_INPUT].isConnected()) * ((inputs[B_INPUT].getVoltage()) * (params[B_PARAM].getValue())) + (!inputs[B_INPUT].isConnected()) * (5* (params[B_PARAM].getValue()));
     
-    // sample and holds
-    // get a new sample on the rising edge at the sh control output
-    if (shAControl > shALast) {
-        aSample = aIn;
-    }
-    if (shBControl > shBLast) {
-        bSample = bIn;
-    }
+    // // sample and holds
+    // // get a new sample on the rising edge at the sh control output
+    // if (shAControl > shALast) {
+    //     aSample = aIn;
+    // }
+    // if (shBControl > shBLast) {
+    //     bSample = bIn;
+    // }
 
-    shALast = shAControl;
-    shBLast = shBControl;
+    // shALast = shAControl;
+    // shBLast = shBControl;
 
-    // either use the sample or track depending on the sh control output
-    aIn = shAControl * aSample + !shAControl * aIn;
-    bIn = shBControl * bSample + !shBControl * bIn;
+    // // either use the sample or track depending on the sh control output
+    // aIn = shAControl * aSample + !shAControl * aIn;
+    // bIn = shBControl * bSample + !shBControl * bIn;
 
-    // VCA/mixing stage
-    // normalize 12 bits to 0-1
-    outputs[MAIN_OUTPUT].setVoltage(bIn*(dac2Sample/4095.0) + aIn*(dac1Sample/4095.0)); 
-    outputs[AUX_DAC_OUTPUT].setVoltage((dac3Sample/4095.0 - .5) * -10.666666666);
-    outputs[LOGICA_OUTPUT].setVoltage(logicAState * 5.0);
-    outputs[AUX_LOGIC_OUTPUT].setVoltage(auxLogicState * 5.0);
+    // // VCA/mixing stage
+    // // normalize 12 bits to 0-1
+    // outputs[MAIN_OUTPUT].setVoltage(bIn*(dac2Sample/4095.0) + aIn*(dac1Sample/4095.0)); 
+    // outputs[AUX_DAC_OUTPUT].setVoltage((dac3Sample/4095.0 - .5) * -10.666666666);
+    // outputs[LOGICA_OUTPUT].setVoltage(logicAState * 5.0);
+    // outputs[AUX_LOGIC_OUTPUT].setVoltage(auxLogicState * 5.0);
 
-    clockDivider = 0;
+    // clockDivider = 0;
     
 }
 

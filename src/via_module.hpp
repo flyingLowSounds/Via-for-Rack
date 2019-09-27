@@ -63,7 +63,7 @@ struct Via : Module {
 
     }
 
-    ViaModule * virtualIO;
+    ViaModuleGeneric * virtualIO;
 
     uint32_t presetData[6];
     
@@ -103,6 +103,23 @@ struct Via : Module {
     float * dac1DecimatorBuffer;
     float * dac2DecimatorBuffer;
     float * dac3DecimatorBuffer;
+
+    int32_t processingIndex = 0;
+
+    #define IO_BUFFER_SIZE 4
+
+    float aInputs[IO_BUFFER_SIZE];
+    float bInputs[IO_BUFFER_SIZE];
+    float mainLogicInputs[IO_BUFFER_SIZE];
+    float auxLogicInputs[IO_BUFFER_SIZE];
+    float cv2Inputs[IO_BUFFER_SIZE];
+    float cv3Inputs[IO_BUFFER_SIZE];
+
+    float mainOutputs[IO_BUFFER_SIZE];
+    float auxOutputs[IO_BUFFER_SIZE];
+    float mainLogicOutputs[IO_BUFFER_SIZE];
+    float auxLogicOutputs[IO_BUFFER_SIZE];
+
 
     pow2Decimate<OVERSAMPLE_AMOUNT, OVERSAMPLE_QUALITY> dac1Decimator;
     pow2Decimate<OVERSAMPLE_AMOUNT, OVERSAMPLE_QUALITY> dac2Decimator;
@@ -148,22 +165,24 @@ struct Via : Module {
     }
 
     // 2 sets the "GPIO" high, 1 sets it low, 0 is a no-op
-    inline int32_t virtualLogicOut(int32_t logicOut, int32_t control) {
-        return clamp(logicOut + (control & 2) - (control & 1), 0, 1);
+    inline int32_t virtualLogicOut(int32_t logicOut, int32_t GPIO, uint32_t reg) {
+        uint32_t on = (((GPIO >> (reg + 16))) & 1);
+        uint32_t off = (((GPIO >> (reg))) & 1);
+        return clamp(logicOut + (on * 2) - off, 0, 1);
     }
 
-    float ledDecay = 1.0/48000.0;
+    float ledDecay = 1.f/(48000.f);
 
     inline void updateLEDs(void) {
 
-        lights[LED1_LIGHT].setSmoothBrightness(ledAState, ledDecay);
-        lights[LED3_LIGHT].setSmoothBrightness(ledBState, ledDecay);
-        lights[LED2_LIGHT].setSmoothBrightness(ledCState, ledDecay);
-        lights[LED4_LIGHT].setSmoothBrightness(ledDState, ledDecay);
+        lights[LED1_LIGHT].setSmoothBrightness((float) !ledAState, ledDecay);
+        lights[LED3_LIGHT].setSmoothBrightness((float) !ledBState, ledDecay);
+        lights[LED2_LIGHT].setSmoothBrightness((float) !ledCState, ledDecay);
+        lights[LED4_LIGHT].setSmoothBrightness((float) !ledDState, ledDecay);
 
-        lights[RED_LIGHT].setSmoothBrightness(virtualIO->redLevelWrite/4095.0, ledDecay);
-        lights[GREEN_LIGHT].setSmoothBrightness(virtualIO->greenLevelWrite/4095.0, ledDecay);
-        lights[BLUE_LIGHT].setSmoothBrightness(virtualIO->blueLevelWrite/4095.0, ledDecay);
+        lights[RED_LIGHT].setSmoothBrightness(virtualIO->redLevelOut/4095.0, ledDecay);
+        lights[GREEN_LIGHT].setSmoothBrightness(virtualIO->greenLevelOut/4095.0, ledDecay);
+        lights[BLUE_LIGHT].setSmoothBrightness(virtualIO->blueLevelOut/4095.0, ledDecay);
 
         float output = outputs[MAIN_OUTPUT].value/8.0;
         lights[OUTPUT_RED_LIGHT].setSmoothBrightness(clamp(-output, 0.0, 1.0), ledDecay);
@@ -173,24 +192,27 @@ struct Via : Module {
 
     inline void updateLogicOutputs(void) {
 
-                // the A B C D enumeration of the LEDs in the Via library makes little to no sense 
-        // but its woven pretty deep so is a nagging style thing to fix
+        ledAState = virtualLogicOut(ledAState, virtualIO->GPIOF, 7);
+        ledBState = virtualLogicOut(ledBState, virtualIO->GPIOC, 14);
+        ledCState = virtualLogicOut(ledCState, virtualIO->GPIOA, 2);
+        ledDState = virtualLogicOut(ledDState, virtualIO->GPIOB, 2);
 
-        ledAState = virtualLogicOut(ledAState, virtualIO->ledAOutput);
-        ledBState = virtualLogicOut(ledBState, virtualIO->ledBOutput);
-        ledCState = virtualLogicOut(ledCState, virtualIO->ledCOutput);
-        ledDState = virtualLogicOut(ledDState, virtualIO->ledDOutput);
+        logicAState = virtualLogicOut(logicAState, virtualIO->GPIOC, 13);
+        auxLogicState = virtualLogicOut(auxLogicState, virtualIO->GPIOA, 12);
+        shAControl = virtualLogicOut(shAControl, virtualIO->GPIOB, 8);
+        shBControl = virtualLogicOut(shBControl, virtualIO->GPIOB, 9);
 
-        logicAState = virtualLogicOut(logicAState, virtualIO->aLogicOutput);
-        auxLogicState = virtualLogicOut(auxLogicState, virtualIO->auxLogicOutput);
-        shAControl = virtualLogicOut(shAControl, virtualIO->shAOutput);
-        shBControl = virtualLogicOut(shBControl, virtualIO->shBOutput);
+        virtualIO->GPIOA = 0;
+        virtualIO->GPIOB = 0;
+        virtualIO->GPIOC = 0;
+        virtualIO->GPIOF = 0;
+
     }
 
-    inline void acquireCVs(void) {
+    inline void acquireCVs(int32_t index) {
         // scale -5 - 5 V to -1 to 1 and then convert to 16 bit int;
-        float cv2Scale = (32767.0 * clamp(-inputs[CV2_INPUT].getVoltage()/5, -1.0, 1.0)) * params[CV2AMT_PARAM].getValue();
-        float cv3Scale = (32767.0 * clamp(-inputs[CV3_INPUT].getVoltage()/5, -1.0, 1.0)) * params[CV3AMT_PARAM].getValue();
+        float cv2Scale = (32767.0 * clamp(-cv2Inputs[index]/5, -1.0, 1.0)) * params[CV2AMT_PARAM].getValue();
+        float cv3Scale = (32767.0 * clamp(-cv3Inputs[index]/5, -1.0, 1.0)) * params[CV3AMT_PARAM].getValue();
         int16_t cv2Conversion = (int16_t) cv2Scale;
         int16_t cv3Conversion = (int16_t) cv3Scale;
 
@@ -199,9 +221,9 @@ struct Via : Module {
         virtualIO->inputs.cv3Samples[0] = cv3Conversion;
     }
 
-    inline void processLogicInputs(void) {
+    inline void processLogicInputs(int32_t index) {
 
-        mainLogic.process(rescale(inputs[MAIN_LOGIC_INPUT].getVoltage(), .2, 1.2, 0.f, 1.f));
+        mainLogic.process(rescale(mainLogicInputs[index], .2, 1.2, 0.f, 1.f));
         bool trigState = mainLogic.isHigh();
         if (trigState && !lastTrigState) {
             virtualIO->mainRisingEdgeCallback();
@@ -210,7 +232,7 @@ struct Via : Module {
         }
         lastTrigState = trigState; 
 
-        auxLogic.process(rescale(inputs[AUX_LOGIC_INPUT].getVoltage(), .2, 1.2, 0.f, 1.f));
+        auxLogic.process(rescale(auxLogicInputs[index], .2, 1.2, 0.f, 1.f));
         bool auxTrigState = auxLogic.isHigh();
         if (auxTrigState && !lastAuxTrigState) {
             virtualIO->auxRisingEdgeCallback();
@@ -221,7 +243,7 @@ struct Via : Module {
 
     }
 
-    inline void updateOutputs(void) {
+    inline void updateOutputs(int32_t index) {
 
         int32_t samplesRemaining = OVERSAMPLE_AMOUNT;
         int32_t writeIndex = 0;
@@ -248,9 +270,8 @@ struct Via : Module {
 
         // "model" the circuit
         // A and B inputs with normalled reference voltages
-        float aIn = inputs[A_INPUT].isConnected() ? inputs[A_INPUT].getVoltage() : params[A_PARAM].getValue();
-        float bIn = inputs[B_INPUT].isConnected() ? inputs[B_INPUT].getVoltage() : 5.0;
-        bIn *= params[B_PARAM].getValue();
+        float aIn = aInputs[index];
+        float bIn = bInputs[index];
         
         // sample and holds
         // get a new sample on the rising edge at the sh control output
@@ -270,20 +291,46 @@ struct Via : Module {
 
         // VCA/mixing stage
         // normalize 12 bits to 0-1
-        outputs[MAIN_OUTPUT].setVoltage(bIn*(dac2Sample/4095.0) + aIn*(dac1Sample/4095.0)); 
-        outputs[AUX_DAC_OUTPUT].setVoltage((dac3Sample/4095.0 - .5) * -10.666666666);
-        outputs[LOGICA_OUTPUT].setVoltage(logicAState * 5.0);
-        outputs[AUX_LOGIC_OUTPUT].setVoltage(auxLogicState * 5.0);
+        mainOutputs[index] = (bIn*(dac2Sample/4095.0) + aIn*(dac1Sample/4095.0)); 
+        auxOutputs[index] = ((dac3Sample/4095.0 - .5) * -10.666666666);
+        mainLogicOutputs[index] = (logicAState * 5.0);
+        auxLogicOutputs[index] = (auxLogicState * 5.0);
 
     }
 
     void updateAudioRate(void) {
 
-        acquireCVs();
+        outputs[MAIN_OUTPUT].setVoltage(mainOutputs[processingIndex]); 
+        outputs[AUX_DAC_OUTPUT].setVoltage(auxOutputs[processingIndex]);
+        outputs[LOGICA_OUTPUT].setVoltage(mainLogicOutputs[processingIndex]);
+        outputs[AUX_LOGIC_OUTPUT].setVoltage(auxLogicOutputs[processingIndex]);
 
-        processLogicInputs();
+        aInputs[processingIndex] = inputs[A_INPUT].isConnected() ? inputs[A_INPUT].getVoltage() : params[A_PARAM].getValue();
+        bInputs[processingIndex] = (inputs[B_INPUT].isConnected() ? inputs[B_INPUT].getVoltage() : 5.0) * params[B_PARAM].getValue();
+        mainLogicInputs[processingIndex] = inputs[MAIN_LOGIC_INPUT].getVoltage();
+        auxLogicInputs[processingIndex] = inputs[AUX_LOGIC_INPUT].getVoltage();
+        cv2Inputs[processingIndex] = inputs[CV2_INPUT].getVoltage();
+        cv3Inputs[processingIndex] = inputs[CV3_INPUT].getVoltage();
 
-        updateOutputs();
+        processingIndex ++;
+
+        if (processingIndex >= IO_BUFFER_SIZE - 1) {
+
+            for (int index = 0; index < IO_BUFFER_SIZE; index ++) {  
+
+                acquireCVs(index);
+
+                processLogicInputs(index);
+
+                updateOutputs(index);
+
+            }
+
+            updateLEDs();
+
+            processingIndex = 0;
+
+        }
 
         clockDivider = 0;
 
