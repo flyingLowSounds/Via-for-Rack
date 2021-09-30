@@ -60,14 +60,18 @@ struct RGBTriangle : ModuleLightWidget {
 };
 
 
-struct ViaSifamBlack : RoundKnob {
+struct ViaSifamBlack : SvgKnob {
     ViaSifamBlack() {
+        minAngle = -0.83 * M_PI;
+		maxAngle = 0.83 * M_PI;
         setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/knob_sifam_blkcap.svg")));
     }
 };
 
-struct ViaSifamGrey : RoundKnob {
+struct ViaSifamGrey : SvgKnob {
     ViaSifamGrey() {
+        minAngle = -0.83 * M_PI;
+		maxAngle = 0.83 * M_PI;
         setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/knob_sifam_grycap.svg")));
     }
 };
